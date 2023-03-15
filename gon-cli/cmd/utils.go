@@ -4,6 +4,12 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -14,11 +20,6 @@ import (
 	"github.com/gjermundgaraba/gon/chains"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"log"
-	"os"
-	"regexp"
-	"strings"
-	"time"
 )
 
 var (
@@ -183,6 +184,7 @@ func sendTX(clientCtx client.Context, flagSet *pflag.FlagSet, msgs ...sdk.Msg) (
 		}
 	}
 
+	fmt.Println("2", []byte(clientCtx.FromAddress))
 	txf, err := txf.Prepare(clientCtx)
 	if err != nil {
 		return nil, err
@@ -198,14 +200,20 @@ func sendTX(clientCtx client.Context, flagSet *pflag.FlagSet, msgs ...sdk.Msg) (
 		_, _ = fmt.Fprintf(os.Stderr, "%s\n", tx.GasEstimateResponse{GasEstimate: txf.Gas()})
 	}
 
+	fmt.Println("5")
+
 	if clientCtx.Simulate {
 		return nil, nil
 	}
+
+	fmt.Println("6")
 
 	unsignedTx, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("7")
 
 	if !clientCtx.SkipConfirm {
 		txBytes, err := clientCtx.TxConfig.TxJSONEncoder()(unsignedTx.GetTx())

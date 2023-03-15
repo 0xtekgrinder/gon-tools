@@ -2,17 +2,22 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/gjermundgaraba/gon/chains"
 	"github.com/spf13/cobra"
 )
 
 func transferNFTInteractive(cmd *cobra.Command) error {
-	sourceChain := chooseChain("Select source chain")
+	src, _ := cmd.Flags().GetString(flagSrcChainID)
+	var sourceChain chains.Chain
+	for _, chain := range chains.Chains {
+		if string(chain.ChainID()) == src {
+			sourceChain = chain
+		}
+	}
+
 	setAddressPrefixes(sourceChain.Bech32Prefix())
 
 	key := chooseOrCreateKey(cmd, sourceChain)
@@ -23,34 +28,46 @@ func transferNFTInteractive(cmd *cobra.Command) error {
 	clientCtx := getClientTxContext(cmd, sourceChain)
 	fromAddress := getAddressForChain(clientCtx, sourceChain, key)
 
-	destinationChain := chooseChain("Select destination chain", sourceChain)
-	_ = destinationChain
+	dst, _ := cmd.Flags().GetString(flagDstChainID)
+	var destinationChain chains.Chain
+	for _, chain := range chains.Chains {
+		if string(chain.ChainID()) == dst {
+			destinationChain = chain
+		}
+	}
 
-	selectedClass := getUsersNfts(cmd.Context(), clientCtx, sourceChain, fromAddress)
+	class, _ := cmd.Flags().GetString(flagNFTClassID)
+	selectedClass := getUsersNfts(cmd.Context(), clientCtx, sourceChain, fromAddress, class)
+	fmt.Println("Class ID: ", selectedClass)
 	if len(selectedClass.NFTs) == 0 {
 		fmt.Println("No NFT classes found")
 		return nil
 	}
 
-	// select nft
-	// TODO: Use multiselect to be able to send more than one at a time
-	selectedNFT := chooseOne("Select NFT", selectedClass.NFTs)
-
-	var destinationAddress string
-	if err := survey.AskOne(&survey.Input{Message: "What is the destination address? (Leave empty to send to same address as owner on destination)"}, &destinationAddress); err != nil {
-		log.Fatalf("Error getting destination address: %v", err)
+	var selectedNFT chains.NFT
+	nft, _ := cmd.Flags().GetString(flagNFTID)
+	for _, cNft := range selectedClass.NFTs {
+		if strings.ToLower(cNft.ID) == strings.ToLower(nft) {
+			selectedNFT = cNft
+		}
 	}
+
+	destinationAddress, _ := cmd.Flags().GetString(flagDestAddress)
 	if destinationAddress == "" {
 		destinationAddress = getAddressForChain(clientCtx, destinationChain, key)
 		fmt.Println("Destination address:", destinationAddress)
 	}
 
-	chooseChannelQuestion := "Select channel to use"
-	if selectedClass.LastIBCChannel.Port != "" {
-		chooseChannelQuestion += fmt.Sprintf(" (last one was %s)", selectedClass.LastIBCChannel.Label())
+	channelId, _ := cmd.Flags().GetString(flagChannelID)
+	var chosenChannel chains.NFTChannel
+	var chosenConnection chains.NFTConnection
+	connections := sourceChain.GetConnectionsTo(destinationChain)
+	for _, connection := range connections {
+		if connection.ChannelA.Label() == channelId {
+			chosenChannel = connection.ChannelA
+			chosenConnection = connection
+		}
 	}
-	chosenConnection := chooseConnection(sourceChain, destinationChain, chooseChannelQuestion)
-	chosenChannel := chosenConnection.ChannelA
 
 	tryToForceTimeout, _ := cmd.Flags().GetBool(flagTryToForceTimeout)
 	targetChainHeight, targetChainTimestamp := getCurrentChainStatus(cmd.Context(), getQueryClientContext(cmd, destinationChain))
@@ -60,6 +77,7 @@ func transferNFTInteractive(cmd *cobra.Command) error {
 	if tryToForceTimeout {
 		clientCtx = clientCtx.WithSkipConfirmation(true)
 	}
+
 	txResponse, err := sendTX(clientCtx, cmd.Flags(), msg)
 	if err != nil {
 		panic(err)

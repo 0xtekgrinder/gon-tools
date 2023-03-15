@@ -3,14 +3,15 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
+	"strings"
+
 	wasmdtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/gjermundgaraba/gon/chains"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/libs/json"
-	"log"
-	"strings"
 )
 
 type queryNftContractResponse struct {
@@ -35,7 +36,7 @@ func queryNFTsInteractive(cmd *cobra.Command) error {
 	clientCtx := getClientTxContext(cmd, chain)
 	fromAddress := getAddressForChain(clientCtx, chain, key)
 
-	class := getUsersNfts(cmd.Context(), clientCtx, chain, fromAddress)
+	class := getUsersNfts(cmd.Context(), clientCtx, chain, fromAddress, "")
 	fmt.Printf("Class ID: %s \n", class.ClassID)
 	fmt.Printf("Base class ID: %s \n", class.BaseClassID)
 	fmt.Printf("Full Path Class ID: %s \n", class.FullPathClassID)
@@ -55,18 +56,22 @@ func queryNFTsInteractive(cmd *cobra.Command) error {
 	return nil
 }
 
-func getUsersNfts(ctx context.Context, clientCtx client.Context, chain chains.Chain, address string) chains.NFTClass {
+func getUsersNfts(ctx context.Context, clientCtx client.Context, chain chains.Chain, address string, classID string) chains.NFTClass {
 	switch chain.NFTImplementation() {
 	case chains.CosmosSDK:
 		classes := chain.ListNFTClassesThatHasNFTs(ctx, clientCtx, address)
 		if len(classes) == 0 {
 			log.Fatal("No NFT classes found")
 		}
-		chosenClass := chooseOne("NFT Class", classes)
-
+		var chosenClass chains.NFTClass
+		for _, plsClass := range classes {
+			if plsClass.FullPathClassID == classID {
+				chosenClass = plsClass
+				break
+			}
+		}
 		return chosenClass
 	case chains.CosmWasm:
-		classID := askForString("Class ID (full IBC path/trace)")
 		splitClassID := strings.Split(classID, "/")
 		if len(splitClassID) <= 2 {
 			panic("only IBC path class IDs are supported for CosmWasm chains right now")

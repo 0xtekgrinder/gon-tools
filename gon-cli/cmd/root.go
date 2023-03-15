@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	wasmdtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	omniflixnfttypes "github.com/OmniFlix/onft/types"
 	nfttransfertypes "github.com/bianjieai/nft-transfer/types"
@@ -21,12 +23,18 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/strangelove-ventures/lens/client/codecs/ethermint"
 	tmcfg "github.com/tendermint/tendermint/config"
-	"os"
 )
 
 const (
 	flagTryToForceTimeout = "try-to-timeout"
 	flagSelfRelay         = "self-relay"
+
+	flagSrcChainID  = "src"
+	flagDstChainID  = "dst"
+	flagDestAddress = "dest-address"
+	flagNFTClassID  = "class-id"
+	flagNFTID       = "nft-id"
+	flagChannelID   = "channel-id"
 
 	createNFTClassOption  OptionString = "Create NFT Class"
 	createNFTClassCommand              = "create-class"
@@ -164,6 +172,12 @@ func NewRootCmd(appHomeDir string) *cobra.Command {
 	flags.AddTxFlagsToCmd(rootCmd)
 	rootCmd.Flags().Bool(flagTryToForceTimeout, false, "Try to force a timeout")
 	rootCmd.Flags().Bool(flagSelfRelay, false, "Relay transfer transactions yourself - requires go relayer config to be set up correctly")
+	rootCmd.Flags().String(flagSrcChainID, "", "Wrong src chain id")
+	rootCmd.Flags().String(flagDstChainID, "", "Wrong dest chain id")
+	rootCmd.Flags().String(flagDestAddress, "", "Wrong dest address")
+	rootCmd.Flags().String(flagNFTClassID, "", "Wrong NFT class id")
+	rootCmd.Flags().String(flagNFTID, "", "Wrong NFT id")
+	rootCmd.Flags().String(flagChannelID, "", "Wrong channel id")
 
 	return rootCmd
 }
