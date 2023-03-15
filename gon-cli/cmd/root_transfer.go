@@ -9,6 +9,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func getCorrectedKeyName(originalKeyName string, chain chains.Chain) string {
+	correctedKeyName := originalKeyName
+	switch chain.KeyAlgo() {
+	case chains.KeyAlgoEthSecp256k1:
+		correctedKeyName = getEthermintKeyName(originalKeyName)
+	case chains.KeyAlgoSecp256k1:
+		correctedKeyName = getDefaultKeyName(originalKeyName)
+	}
+
+	return correctedKeyName
+}
+
 func transferNFTInteractive(cmd *cobra.Command) error {
 	src, _ := cmd.Flags().GetString(flagSrcChainID)
 	var sourceChain chains.Chain
@@ -21,7 +33,7 @@ func transferNFTInteractive(cmd *cobra.Command) error {
 	setAddressPrefixes(sourceChain.Bech32Prefix())
 
 	key := chooseOrCreateKey(cmd, sourceChain)
-	if err := cmd.Flags().Set(flags.FlagFrom, key); err != nil {
+	if err := cmd.Flags().Set(flags.FlagFrom, getCorrectedKeyName(key, sourceChain)); err != nil {
 		panic(err)
 	}
 
@@ -62,12 +74,15 @@ func transferNFTInteractive(cmd *cobra.Command) error {
 	var chosenChannel chains.NFTChannel
 	var chosenConnection chains.NFTConnection
 	connections := sourceChain.GetConnectionsTo(destinationChain)
+	fmt.Println("Connections: ", connections)
 	for _, connection := range connections {
 		if connection.ChannelA.Label() == channelId {
 			chosenChannel = connection.ChannelA
 			chosenConnection = connection
 		}
 	}
+
+	fmt.Println("Channel ID: ", chosenChannel.Label())
 
 	tryToForceTimeout, _ := cmd.Flags().GetBool(flagTryToForceTimeout)
 	targetChainHeight, targetChainTimestamp := getCurrentChainStatus(cmd.Context(), getQueryClientContext(cmd, destinationChain))
